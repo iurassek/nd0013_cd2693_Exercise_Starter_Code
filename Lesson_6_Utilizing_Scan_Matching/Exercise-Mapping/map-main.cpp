@@ -1,4 +1,3 @@
-
 #include <carla/client/Client.h>
 #include <carla/client/ActorBlueprint.h>
 #include <carla/client/BlueprintLibrary.h>
@@ -105,7 +104,7 @@ int main(){
 
 	
 	auto client = cc::Client("localhost", 2000);
-	client.SetTimeout(5s);
+	client.SetTimeout(2s);
 	auto world = client.GetWorld();
 
 	auto blueprint_library = world.GetBlueprintLibrary();
@@ -145,12 +144,11 @@ int main(){
 		if(new_scan){
 			auto scan = boost::static_pointer_cast<csd::LidarMeasurement>(data);
 	
-			Eigen::Matrix4d transform= Eigen::Matrix4d::Identity ();
-			// TODO: Set transform to pose using transform3D()
+			Eigen::Matrix4d transform = transform3D(pose.rotation.yaw, pose.rotation.pitch, pose.rotation.roll, pose.position.x, pose.position.y, pose.position.z);
 			for (auto detection : *scan){
 				if((detection.x*detection.x + detection.y*detection.y + detection.z*detection.z) > 8.0){ // Don't include points touching ego
 					Eigen::Vector4d local_point(detection.x, detection.y, detection.z, 1);
-					Eigen::Vector4d transform_point = local_point; // TODO: Multiply local_point by transform
+					Eigen::Vector4d transform_point = transform * local_point;
 					pclCloud.points.push_back(PointT(transform_point[0], transform_point[1], transform_point[2]));
 				}
 	
@@ -203,12 +201,10 @@ int main(){
 
 		viewer->spinOnce ();
 		
-      	double distanceRes = 5.0; // CANDO: Can modify this value
-		double timeRes = 1.0; // CANDO: Can modify this value
 		currentTime = std::chrono::system_clock::now();
 		if(!new_scan){
 			std::chrono::duration<double> last_scan_seconds = currentTime - lastScanTime; 
-			if(last_scan_seconds.count() > timeRes && minDistance(Point(pose.position.x, pose.position.y, pose.position.z), scanPoses) > distanceRes){
+			if(last_scan_seconds.count() > 1.0 && minDistance(Point(pose.position.x, pose.position.y, pose.position.z), scanPoses) > 5.0){
 				scanPoses.push_back(Point(pose.position.x, pose.position.y, pose.position.z));
 				new_scan = true;
 
@@ -219,8 +215,8 @@ int main(){
 	// save the point cloud map
 	PointCloudT::Ptr scanCloud(new PointCloudT);
 	*scanCloud = pclCloud;
-  	scanCloud->width = scanCloud->points.size();
-  	scanCloud->height = 1;
+	scanCloud->width = scanCloud->points.size();
+	scanCloud->height = 1;
 
 	// TODO: Downsample the map point cloud using a voxel filter
 
