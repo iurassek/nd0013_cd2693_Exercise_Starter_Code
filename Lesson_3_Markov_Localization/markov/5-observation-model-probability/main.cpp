@@ -13,3 +13,4 @@ int main() {
 
   return 0;
 }
+float value = parameter; // Set the value to the control parameter or observation measurement
