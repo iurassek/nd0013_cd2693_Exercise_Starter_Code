@@ -78,3 +78,22 @@ vector<float> initialize_priors(int map_size, vector<float> landmark_positions,
   
   return priors;
 }
+float motion_model(float pseudo_position, float movement, vector<float> priors,
+                   int map_size, float control_stdev) {
+    // Initialize probability
+    float position_prob = 0.0f;
+
+    // Iterate over each possible position on the map
+    for (int i = 0; i < map_size; ++i) {
+        // Calculate the index of the new position after movement
+        int new_position = int(i - pseudo_position + movement) % map_size;
+
+        // Calculate the probability of being at the new position using Gaussian distribution
+        float gauss_prob = Helpers::normpdf(i, new_position, control_stdev);
+
+        // Weight the probability by the prior probability at the current position
+        position_prob += gauss_prob * priors[i];
+    }
+
+    return position_prob;
+}
