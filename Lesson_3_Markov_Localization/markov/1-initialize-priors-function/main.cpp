@@ -43,3 +43,24 @@ vector<float> initialize_priors(int map_size, vector<float> landmark_positions,
 
   return priors;
 }
+vector<float> initialize_priors(int map_size, vector<float> landmark_positions,
+                                float position_stdev) {
+
+  // initialize priors assuming vehicle at landmark +/- 1.0 meters position stdev
+
+  // set all priors to 0.0
+  vector<float> priors(map_size, 0.0);
+
+  // Calculate the probability for each landmark position +/- 1.0 standard deviation
+  float normalization_term = landmark_positions.size() * (position_stdev * 2 + 1);
+  for (float landmark : landmark_positions) {
+    for (float i = 0; i < map_size; ++i) {
+      float distance = i - landmark;
+      distance = distance < 0 ? -distance : distance; // absolute distance
+      priors[i] += 1.0f / normalization_term;
+    }
+  }
+
+  return priors;
+}
+
