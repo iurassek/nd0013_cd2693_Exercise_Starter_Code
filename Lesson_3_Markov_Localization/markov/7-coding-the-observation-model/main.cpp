@@ -84,3 +84,35 @@ vector<float> pseudo_range_estimator(vector<float> landmark_positions,
 
   return pseudo_ranges;
 }
+
+float observation_model(vector<float> landmark_positions, 
+                        vector<float> observations, vector<float> pseudo_ranges, 
+                        float distance_max, float observation_stdev) {
+    // Initialize distance probability
+    float distance_prob = 1.0f;
+
+    // Iterate over each observation
+    for (int i = 0; i < observations.size(); ++i) {
+        // If there are no pseudo ranges, set distance probability to zero
+        if (pseudo_ranges.empty()) {
+            distance_prob = 0.0f;
+        } else {
+            // Calculate the difference between the observed distance and the closest pseudo range
+            float min_diff = std::abs(observations[i] - pseudo_ranges[0]);
+
+            // Iterate over each pseudo range to find the closest one to the observation
+            for (int j = 1; j < pseudo_ranges.size(); ++j) {
+                float diff = std::abs(observations[i] - pseudo_ranges[j]);
+                min_diff = std::min(min_diff, diff);
+            }
+
+            // Calculate the likelihood probability term based on the minimum difference
+            float obs_prob = Helpers::normpdf(min_diff, 0.0f, observation_stdev);
+
+            // Multiply the distance probability by the observation probability
+            distance_prob *= obs_prob;
+        }
+    }
+
+    return distance_prob;
+}
