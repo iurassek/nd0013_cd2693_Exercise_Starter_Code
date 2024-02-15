@@ -13,3 +13,13 @@ int main() {
     std::cout << "Doubled value: " << value << std::endl;
     return 0;
 }
+#include "doubler.h"
+#include <iostream>
+
+int main() {
+    int number = 5;
+    int doubledNumber = doubler(number);
+    std::cout << "Original number: " << number << std::endl;
+    std::cout << "Doubled number: " << doubledNumber << std::endl;
+    return 0;
+}
