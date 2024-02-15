@@ -18,3 +18,4 @@ int main() {
 
   return 0;
 }
+float value = 2.0;  // Difference in distances between x_t and x_{t-1}
