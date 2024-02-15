@@ -61,7 +61,7 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 
 double Probability(Eigen::MatrixXd X, Eigen::MatrixXd Q, Eigen::MatrixXd S){
 	// TODO: calculate the probibility of the point given mean and standard deviation
-	return 0;
+	return exp( -0.5 * ( (X-Q).transpose() * S.inverse() * (X-Q) )(0,0) );
 }
 
 struct Cell{
@@ -186,15 +186,30 @@ struct Grid{
 
 Cell PDF(PointCloudT::Ptr input, int res, pcl::visualization::PCLVisualizer::Ptr& viewer){
 
-	// TODO: Calculate the 2 x 1 matrix Q, which is the mean of the input points
+	// Calculate the mean
 	Eigen::MatrixXd Q(2,1);
 	Q << Eigen::MatrixXd::Zero(2,1);
-	
+	for(PointT point : input->points){
+		Q(0,0) += point.x;
+		Q(1,0) += point.y;
+	}
+	Q(0,0) = Q(0,0)/input->points.size();
+	Q(1,0) = Q(1,0)/input->points.size();
 
-	// TODO: Calculate the 2 x 2 matrix S, which is standard deviation of the input points
+	// Calculate sigma
 	Eigen::MatrixXd S(2,2);
 	S << Eigen::MatrixXd::Zero(2,2);
-	
+	for(PointT point : input->points){
+		Eigen::MatrixXd X(2,1);
+		X(0,0) = point.x;
+		X(1,0) = point.y;
+
+		S += (X-Q) * (X-Q).transpose();
+	}
+	S(0,0) = S(0,0)/input->points.size();
+	S(0,1) = S(0,1)/input->points.size();
+	S(1,0) = S(1,0)/input->points.size();
+	S(1,1) = S(1,1)/input->points.size();
 
 	PointCloudTI::Ptr pdf(new PointCloudTI);
 	for(double i = 0.0; i <= 10.0; i += 10.0/double(res)){
@@ -223,26 +238,47 @@ Cell PDF(PointCloudT::Ptr input, int res, pcl::visualization::PCLVisualizer::Ptr
 template<typename Derived>
 void NewtonsMethod(PointT point, double theta, Cell cell, Eigen::MatrixBase<Derived>& g_previous, Eigen:: MatrixBase<Derived>& H_previous){
 
-	// TODO: Get the Q and S matrices from cell, invert S matrix
+	Eigen::MatrixXd Q = cell.Q;
+	Eigen::MatrixXd Si = cell.S.inverse();
 
-	// TODO: make a 2 x 1 matrix from input point
-	
-	// TODO: calculate matrix q from X and Q
-	
-	// TODO: calculate the 3 2 x 1 partial derivative matrices
-	// each with respect to x, y, and theta
+	Eigen::MatrixXd X(2,1);
+	X(0,0) = point.x;
+	X(1,0) = point.y;
 
-	// TODO: calcualte the 1 x 1 exponential matrix which uses q, and S inverse
+	Eigen::MatrixXd q = X - Q;
 
-	// TODO: calculate the matrix g which uses q, exponential, S inverse, and partial derivatives
+	Eigen::MatrixXd q_p1(2,1);
+	q_p1(0,0) = 1.0;
+	q_p1(1,0) = 0.0;
+	Eigen::MatrixXd q_p2(2,1);
+	q_p2(0,0) = 0.0;
+	q_p2(1,0) = 1.0;
+	Eigen::MatrixXd q_p3(2,1);
+	q_p3(0,0) = -point.x*sin(theta)-point.y*cos(theta);
+	q_p3(1,0) =  point.x*cos(theta)-point.y*sin(theta);
+
+	Eigen::MatrixXd q_pp(2,1);
+	q_pp(0,0) = -point.x*cos(theta)+point.y*sin(theta);
+	q_pp(1,0) = -point.x*sin(theta)-point.y*cos(theta);
+
+	Eigen::MatrixXd EXP(1,1);
+	EXP(0,0) = exp(-0.5 * (q.transpose() * Si * q)(0,0) );
+
 	Eigen::MatrixXd g(3,1);
-	g << Eigen::MatrixXd::Zero(3,1);
-    
-    // TODO: calculate the 2 x 1 second order partial derivative matrix
+	g(0,0) = (q.transpose() * Si * q_p1 * EXP)(0,0);
+	g(1,0) = (q.transpose() * Si * q_p2 * EXP)(0,0);
+	g(2,0) = (q.transpose() * Si * q_p3 * EXP)(0,0);
 
-	// TODO: calculate the matrix H which uses q, exponential, S inverse, partial derivatives, and second order partial derivative
 	Eigen::MatrixXd H(3,3);
-	H << Eigen::MatrixXd::Zero(3,3);
+	H(0,0) = (-EXP*( (-q.transpose()*Si*q_p1)*(-q.transpose()*Si*q_p1)+(-q_p1.transpose()*Si*q_p1)))(0,0);
+	H(0,1) = (-EXP*( (-q.transpose()*Si*q_p1)*(-q.transpose()*Si*q_p2)+(-q_p2.transpose()*Si*q_p1)))(0,0);
+	H(0,2) = (-EXP*( (-q.transpose()*Si*q_p1)*(-q.transpose()*Si*q_p3)+(-q_p3.transpose()*Si*q_p1)))(0,0);
+	H(1,0) = (-EXP*( (-q.transpose()*Si*q_p2)*(-q.transpose()*Si*q_p1)+(-q_p1.transpose()*Si*q_p2)))(0,0);
+	H(1,1) = (-EXP*( (-q.transpose()*Si*q_p2)*(-q.transpose()*Si*q_p2)+(-q_p2.transpose()*Si*q_p2)))(0,0);
+	H(1,2) = (-EXP*( (-q.transpose()*Si*q_p2)*(-q.transpose()*Si*q_p3)+(-q_p3.transpose()*Si*q_p2)))(0,0);
+	H(2,0) = (-EXP*( (-q.transpose()*Si*q_p3)*(-q.transpose()*Si*q_p1)+(-q_p1.transpose()*Si*q_p3)))(0,0);
+	H(2,1) = (-EXP*( (-q.transpose()*Si*q_p3)*(-q.transpose()*Si*q_p2)+(-q_p2.transpose()*Si*q_p3)))(0,0);
+	H(2,2) = (-EXP*( (-q.transpose()*Si*q_p3)*(-q.transpose()*Si*q_p3)+(-q.transpose()*Si*q_pp)+(-q_p3.transpose()*Si*q_p3)))(0,0);
 
 	H_previous += H;
 	g_previous += g;
@@ -352,7 +388,7 @@ int main(){
 	viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)&viewer);
 
 	// Part 1: Visualize a PDF cell
-	bool part1 = true;
+	bool part1 = false;
 	if(part1){
 		// Create Input from set of points in (x,y) range 0 - 10
 		PointCloudT::Ptr input(new PointCloudT);
@@ -375,7 +411,7 @@ int main(){
 		PointT point(1,2,1); // CANDO: change test point to see how it converges
 		
 		input->points.push_back(PointT(point.x, point.y, 1.0));
-		for(int iteration = 0; iteration < 1; iteration++){ // TODO: increase the iteration count to get convergence
+		for(int iteration = 0; iteration < 20; iteration++){ // TODO: increase the iteration count to get convergence
 			
 			Eigen::MatrixXd g(3,1);
 			g << Eigen::MatrixXd::Zero(3,1);
@@ -385,12 +421,13 @@ int main(){
 
 			// TODO: finish writing the NewtonsMethod function
 			NewtonsMethod(point, 0, cell, g, H);
-			PosDef(H, 0, 0, 0); // TODO: change the increment and max values to nonzero values
+			PosDef(H, 0, 5, 100); // TODO: change the increment and max values to nonzero values
 			// TODO: calculate the 3 x 1 matrix T by using H inverse and g
+			Eigen::MatrixXd T = -H.inverse()*g;
 
 			// TODO: calculate the new point by transforming point by the T matrix which is [x translation, y translation, theta rotation]
 			// 	   pointT(new x, new y, 1), values below should be nonzero
-			PointT pointT(0, 0, 1); 
+			PointT pointT(point.x * cos(T(2,0)) - point.y * sin(T(2,0)) + T(0,0) - point.x ,  point.x * sin(T(2,0)) + point.y * cos(T(2,0)) + T(1,0) - point.y , 1);
 			double magT = sqrt(pointT.x*pointT.x + pointT.y*pointT.y);
 			double maxDelta = 0.5; // CANDO: change the step size value
 			pointT.x *= maxDelta/magT;
@@ -496,12 +533,12 @@ int main(){
 	
 						// TODO: calculate the new point pointTran, by transforming point by x, y, and theta 
 						// 	   pointTran(new x, new y, point.z), values below should be nonzero
-						PointT pointTran(0, 0, point.z);
+						PointT pointTran(point.x*cos(theta)-point.y*sin(theta)+x, point.x*sin(theta)+point.y*cos(theta)+y, point.z);
 						NewtonsMethod(pointTran, theta, cell, g, H);
 					}
 				}
 				
-				PosDef(H, 0, 0, 0); // TODO: change the increment and max values to nonzero values
+				PosDef(H, 0, 5, 100); // TODO: change the increment and max values to nonzero values
 	
 				Eigen::MatrixXd T = -H.inverse()*g;
 	
